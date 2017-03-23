@@ -5,6 +5,7 @@ import com.analog.adis16448.frc.ADIS16448_IMU.AHRSAlgorithm;
 import com.analog.adis16448.frc.ADIS16448_IMU.Axis;
 
 import edu.wpi.first.wpilibj.*;
+import edu.wpi.first.wpilibj.GenericHID.Hand;
 import edu.wpi.first.wpilibj.interfaces.Accelerometer;
 import edu.wpi.first.wpilibj.interfaces.Accelerometer.Range;
 import edu.wpi.first.wpilibj.smartdashboard.SmartDashboard;
@@ -28,9 +29,10 @@ public class Robot extends IterativeRobot {
         //imu.calibrate();
         imu.reset();
         pid = new PIDControl(0.013, 0, 0);
-        pid.setOutputLimits(-0.5, 0.5);
+        pid.setOutputLimits(0.5);
         //pid.setOutputRampRate(0.05);
-        
+        pid.setOutputRampRate(0.05);
+        pid.setF(0.1);
         pid.setSetpoint(0);
         
     }
@@ -42,6 +44,8 @@ public class Robot extends IterativeRobot {
     
     boolean run = false;
     
+    boolean newHeadingClick = false;
+    
     public void teleopPeriodic() {
         double currentAngle = (Math.round(imu.getAngleZ() * 100.0) / 100.0) + joystickAngles;
         double pidOutputPower = pid.getOutput(currentAngle);
@@ -52,21 +56,55 @@ public class Robot extends IterativeRobot {
         joystickAngles = 0;
         
         if(gamepad.getRawButton(5)) { //left top
-            joystickAngles = ((leftSpeed - rightSpeed) * 360);
-            drive.tankDrive(pidOutputPower, -pidOutputPower); //maybe?
-            System.out.println(pidOutputPower);
-        } else if(gamepad.getRawButton(6)) {
-            imu.reset();
+        	if(newHeadingClick) {
+        		pid.reset();
+        		imu.reset();
+        		newHeadingClick = false;
+        	}
+            drive.tankDrive(pidOutputPower, -pidOutputPower);
+        } else if(gamepad.getPOV() > 0) {
+        	
+        	double leftSpeedOffseter = 0;
+        	
+        	if(gamepad.getPOV() == 90) {
+        		leftSpeedOffseter = -0.1;
+            	if(newHeadingClick) {
+            		imu.reset();
+            		pid.reset();
+            		joystickAngles = 360;
+            		newHeadingClick = false;
+            	} else{
+            		joystickAngles = 360;
+            		drive.tankDrive(pidOutputPower + leftSpeedOffseter, -pidOutputPower);
+            	}
+        	} else if(gamepad.getPOV() == 270) {
+        		leftSpeedOffseter = 0.1;
+            	if(newHeadingClick) {
+            		imu.reset();
+            		pid.reset();
+            		joystickAngles = -360;
+            		newHeadingClick = false;
+            	} else {
+            		joystickAngles = -360;
+            		drive.tankDrive(pidOutputPower + leftSpeedOffseter, -pidOutputPower);
+            	}	
+        	}
         } else if(gamepad.getRawButton(1))
         {
-            drive.tankDrive((leftSpeed * .6) + (pidOutputPower/4) , (leftSpeed * .6) + (-pidOutputPower/4));
+        	if(newHeadingClick) {
+        		imu.reset();
+        		pid.reset();
+        		newHeadingClick = false;
+        	}
+        	
+        	double leftSpeedOffseter = (rightSpeed > 0) ? 0.05 : -0.06; //ternary operators are great        	
+            drive.tankDrive((rightSpeed * .6) + (pidOutputPower/4) + leftSpeedOffseter, (rightSpeed * .6) + (-pidOutputPower/4));
             System.out.println(pidOutputPower);
+            
         } else {
-            drive.tankDrive(leftSpeed * 0.6, rightSpeed * 0.6);
+        	newHeadingClick = true;
+            drive.tankDrive((leftSpeed * 0.6), rightSpeed * 0.6);
         }
-        
-        System.out.println(imu.getMagZ());
-        
     }
     
     public void disabledPeriodic() {
@@ -86,30 +124,32 @@ public class Robot extends IterativeRobot {
         waitThread(1000);
         
         run = true;
-        
         /*
-        while(run) {
-            waitThread(1000);
-            DriveStraight(1.8, 0.6);
-            DriveTurn(90);
-            DriveStraight(1.2, 0.55);
-            DriveTurn(90);
-            DriveStraight(1.8, 0.6);
-            DriveTurn(90);
-            DriveStraight(1.2, 0.55);
-            DriveTurn(90);
-        }*/
+        DriveStraight(2.15, 0.6);
+        waitThread(1000);
+        DriveTurn(45);
+        waitThread(1000);
+        DriveStraight(0.5, 0.6);
+        waitThread(1000);
+        
+        DriveStraight(0.5, -0.6);
+        waitThread(1000);
+        DriveTurn(-45);
+        waitThread(1000);
+        DriveStraight(2.05, -0.6);
+        */
+        
+        DriveStraight(0.2, 0.5);
+        DriveStraight(1.8, 0.6);
+        waitThread(100);
+        DriveStraight(0.7, 0.5);
+        
+        waitThread(1000);
+        DriveStraight(1.9, -0.6);
+        waitThread(100);
+        DriveStraight(0.5, -0.5);
         
         //AutoDriveInSquareRoutine();
-        
-        DriveTurn(180);
-        waitThread(1500);
-        DriveTurn(180);
-        waitThread(1500);
-        DriveTurn(360);
-        waitThread(1500);
-        DriveTurn(90);
-        
     }
     
     public void AutoDriveInSquareRoutine() {
@@ -154,17 +194,17 @@ public class Robot extends IterativeRobot {
     	pid.reset();
     	imu.reset();
     	
+    	double leftOffseter = 0;
+    	
     	if(angle > 0) {
     		pid.setOutputLimits(0, 0.7);
     	} else{
     		pid.setOutputLimits(0, -0.7);
+    		leftOffseter = 0.125;
     	}
     	
-    	
     	pid.setOutputRampRate(0.5);
-    	
     	pid.setP(0.015);
-    	
     	pid.setD(0.15);
     	pid.setF(.1);
     	
@@ -175,7 +215,7 @@ public class Robot extends IterativeRobot {
         
         System.out.println(pidOutputPower);
         
-        while((inTheZone < 25) && run) {
+        while((inTheZone < 50) && run) {
         	currentAngle = (Math.round(imu.getAngleZ() * 100.0) / 100.0) - (angle * 4);
         	pidOutputPower = pid.getOutput(currentAngle);
         	
@@ -186,7 +226,7 @@ public class Robot extends IterativeRobot {
         		inTheZone++;
         	}
         	
-            drive.tankDrive(pidOutputPower, -pidOutputPower);
+            drive.tankDrive(pidOutputPower + ((pidOutputPower>0) ? (0) : (-leftOffseter)), -pidOutputPower);
             System.out.println(pidOutputPower + " " + currentAngle + " " + (angle*4));
             waitThread(20);
         }
@@ -202,6 +242,7 @@ public class Robot extends IterativeRobot {
     public void DriveStraight(double time, double power) {
         imu.reset();
         pid.reset();
+        
         for(int i=0; i<50 * time; i++) {
             double currentAngle = (Math.round(imu.getAngleZ() * 100.0) / 100.0);
             double pidOutputPower = pid.getOutput(currentAngle);
