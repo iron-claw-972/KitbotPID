@@ -139,15 +139,46 @@ public class Robot extends IterativeRobot {
         DriveStraight(2.05, -0.6);
         */
         
-        DriveStraight(0.2, 0.5);
+        DriveStraight(0.1, 0.4); //prime motor voltage
         DriveStraight(1.8, 0.6);
         waitThread(100);
-        DriveStraight(0.7, 0.5);
+        DriveStraight(0.7, 0.55);
         
         waitThread(1000);
-        DriveStraight(1.9, -0.6);
+        DriveStraight(0.1, -0.55);
+        DriveStraight(1.5, -0.6);
         waitThread(100);
-        DriveStraight(0.5, -0.5);
+        DriveStraight(0.3, -0.55);
+        
+        
+        //move to side for jake
+        
+        waitThread(2000);
+        DriveStraight(0.1, 0.4); //prime motor voltage
+        DriveStraight(0.25, 0.5);
+        
+        waitThread(1000);
+        
+        DriveTurn(90);
+        
+        waitThread(500);
+        
+        DriveStraight(0.1, 0.4); //prime motor voltage
+        DriveStraight(1.2, 0.6);
+        
+        waitThread(1000);
+        
+        DriveTurn(-90);
+        
+        waitThread(2000);
+        
+        DriveTurn(90);
+        
+        waitThread(2000);
+        
+        DriveStraight(0.1, -0.4); //prime motor voltage
+        DriveStraight(0.6, -0.6);
+        
         
         //AutoDriveInSquareRoutine();
     }
@@ -243,11 +274,19 @@ public class Robot extends IterativeRobot {
         imu.reset();
         pid.reset();
         
+    	double leftOffseter = 0;
+    	
+    	if(power > 0) {
+    		leftOffseter = -0.05;
+    	} else{
+    		leftOffseter = 0.125;
+    	}
+    	
         for(int i=0; i<50 * time; i++) {
             double currentAngle = (Math.round(imu.getAngleZ() * 100.0) / 100.0);
             double pidOutputPower = pid.getOutput(currentAngle);
             
-            drive.tankDrive(power + (pidOutputPower/4), power + (-pidOutputPower/4));
+            drive.tankDrive(power + (pidOutputPower/4) - leftOffseter, power + (-pidOutputPower/4));
             
             waitThread(20);
         }
