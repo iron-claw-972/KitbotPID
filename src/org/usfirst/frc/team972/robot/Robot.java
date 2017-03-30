@@ -21,20 +21,24 @@ public class Robot extends IterativeRobot {
     
     PIDControl pid;
     
+    TimeOfFlight tof = new TimeOfFlight();
+    
     RobotDrive drive = new RobotDrive(frontLeftMotor, backLeftMotor, frontRightMotor, backRightMotor);
 
     Joystick gamepad = new Joystick(0);
     
     public void teleopInit() {
         //imu.calibrate();
+    	tof.port.closePort();
+    	tof = new TimeOfFlight();
+    	
         imu.reset();
-        pid = new PIDControl(0.013, 0, 0);
+        pid = new PIDControl(0.012, 0, 0);
         pid.setOutputLimits(0.5);
         //pid.setOutputRampRate(0.05);
         pid.setOutputRampRate(0.05);
-        pid.setF(0.1);
+        pid.setF(0.05);
         pid.setSetpoint(0);
-        
     }
     
     double lastError = 0;
@@ -54,6 +58,9 @@ public class Robot extends IterativeRobot {
         double rightSpeed = gamepad.getRawAxis(1);
         
         joystickAngles = 0;
+        
+        
+        System.out.println(tof.GetDataInMillimeters());
         
         if(gamepad.getRawButton(5)) { //left top
         	if(newHeadingClick) {
@@ -98,8 +105,7 @@ public class Robot extends IterativeRobot {
         	}
         	
         	double leftSpeedOffseter = (rightSpeed > 0) ? 0.05 : -0.06; //ternary operators are great        	
-            drive.tankDrive((rightSpeed * .6) + (pidOutputPower/4) + leftSpeedOffseter, (rightSpeed * .6) + (-pidOutputPower/4));
-            System.out.println(pidOutputPower);
+            drive.tankDrive((rightSpeed) + (pidOutputPower * .5) + leftSpeedOffseter, (rightSpeed) + (-pidOutputPower * .5));
             
         } else {
         	newHeadingClick = true;
@@ -115,15 +121,44 @@ public class Robot extends IterativeRobot {
         imu.calibrate();
         imu.reset();
         
+    	tof.port.closePort();
+    	tof = new TimeOfFlight();
+        
         pid = new PIDControl(0.012, 0.000, 0);
         pid.setOutputLimits(-0.5, 0.5);
         pid.setSetpoint(0);
         
-        System.out.println("Auto will start in 1 second");
-        
-        waitThread(1000);
+        System.out.println("Auto will start now seconds");
         
         run = true;
+        
+        DriveStraightUntilLessThan(5, 0.6, 800);
+        DriveStraightUntilLessThan(2, 0.45, 300);
+        //DriveStraight(1, 0.5);
+        
+        /*
+        DriveStraightLogistics(3, 0.5, -55, 1000, 0.5);
+        
+        waitThread(1200);
+        
+        DriveStraight(0.1, -0.4); //prime motor voltage
+        DriveStraight(0.3, -0.6);
+        
+        waitThread(500);
+        
+        DriveTurn(45);
+        
+        DriveStraight(0.1, 0.4); //prime motor voltage
+        DriveStraight(0.2, 0.6);
+        
+        DriveStraightLogistics(3, 0.5, -60, 1000, 0.5);
+        
+        DriveStraight(0.1, 0.5); //prime motor voltage
+        DriveStraight(2.5, 0.55);
+        
+        DriveStraightLogistics(2.5, 0.5, 60, 1000, 0.5);
+        */
+        
         /*
         DriveStraight(2.15, 0.6);
         waitThread(1000);
@@ -139,6 +174,7 @@ public class Robot extends IterativeRobot {
         DriveStraight(2.05, -0.6);
         */
         
+        /*
         DriveStraight(0.1, 0.4); //prime motor voltage
         DriveStraight(1.8, 0.6);
         waitThread(100);
@@ -179,6 +215,7 @@ public class Robot extends IterativeRobot {
         DriveStraight(0.1, -0.4); //prime motor voltage
         DriveStraight(0.6, -0.6);
         
+        */
         
         //AutoDriveInSquareRoutine();
     }
@@ -218,6 +255,55 @@ public class Robot extends IterativeRobot {
         } catch (InterruptedException e) {
             // TODO Auto-generated catch block
             e.printStackTrace();
+        }
+    }
+    
+    public void DriveStraightUntilLessThan(double time, double power, double dist) {
+    	imu.reset();
+        pid.reset();
+        
+    	double leftOffseter = 0;
+    	
+    	if(power > 0) {
+    		leftOffseter = -0.05;
+    	} else{
+    		leftOffseter = 0.125;
+    	}
+    	
+        for(int i=0; i<50 * time; i++) {
+        	if((tof.GetDataInMillimeters() < dist) && (tof.GetDataInMillimeters() > 0)) {
+        		break;
+        	}
+            double currentAngle = (Math.round(imu.getAngleZ() * 100.0) / 100.0);
+            double pidOutputPower = pid.getOutput(currentAngle);
+            
+            drive.tankDrive(power + (pidOutputPower/4) - leftOffseter, power + (-pidOutputPower/4));
+            
+            waitThread(20);
+        }
+        
+        drive.tankDrive(0, 0);
+    }
+    
+    public void DriveStraight(double time, double power) {
+        imu.reset();
+        pid.reset();
+        
+    	double leftOffseter = 0;
+    	
+    	if(power > 0) {
+    		leftOffseter = -0.05;
+    	} else{
+    		leftOffseter = 0.125;
+    	}
+    	
+        for(int i=0; i<50 * time; i++) {
+            double currentAngle = (Math.round(imu.getAngleZ() * 100.0) / 100.0);
+            double pidOutputPower = pid.getOutput(currentAngle);
+            
+            drive.tankDrive(power + (pidOutputPower/4) - leftOffseter, power + (-pidOutputPower/4));
+            
+            waitThread(20);
         }
     }
     
@@ -270,9 +356,16 @@ public class Robot extends IterativeRobot {
         pid.setI(0);
     }
     
-    public void DriveStraight(double time, double power) {
+    public double LogisticsCurve(double t, double setPoint, double rate, double midTurn) {
+		return setPoint / (1 + Math.exp(-(rate * (t - midTurn))));
+    }
+    
+    public void DriveStraightLogistics(double time, double power, double turnEndPoint, double turnSlope, double turnTime) {
         imu.reset();
         pid.reset();
+        
+        pid.setP(0.0025);
+        pid.setOutputRampRate(0.05);
         
     	double leftOffseter = 0;
     	
@@ -283,13 +376,22 @@ public class Robot extends IterativeRobot {
     	}
     	
         for(int i=0; i<50 * time; i++) {
-            double currentAngle = (Math.round(imu.getAngleZ() * 100.0) / 100.0);
+        	double turnSetpoint;
+        	
+        	turnSetpoint = LogisticsCurve(i / 50, -turnEndPoint * 4, 2, 1.0);
+        	
+            double currentAngle = (Math.round(imu.getAngleZ() * 100.0) / 100.0) + turnSetpoint;
             double pidOutputPower = pid.getOutput(currentAngle);
             
-            drive.tankDrive(power + (pidOutputPower/4) - leftOffseter, power + (-pidOutputPower/4));
+            System.out.println(pidOutputPower);
+            
+            drive.tankDrive(power + (pidOutputPower * .5) - leftOffseter, power + (-pidOutputPower * .5));
             
             waitThread(20);
         }
+        
+        pid.setOutputRampRate(0);
+        pid.setP(0.012);
     }
     
 }
